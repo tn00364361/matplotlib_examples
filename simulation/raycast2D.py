@@ -6,6 +6,7 @@ from matplotlib.animation import FuncAnimation
 from shapely.geometry import MultiPolygon, box
 from shapely.affinity import rotate, translate, scale
 from shapely.ops import cascaded_union
+from numba import jit
 
 
 parser = argparse.ArgumentParser()
@@ -33,7 +34,7 @@ parser.add_argument('--item_size',
 args = parser.parse_args()
 
 
-def raycast(p0, u, q0, v):
+def raycast(p0, u, q0, v, t_default=1.0):
     '''
     Input:
     *   p0
@@ -49,21 +50,23 @@ def raycast(p0, u, q0, v):
         (n2, 2)
         Displacement vectors of other `n2` line segments.
     '''
-    pt_lidar = np.empty_like(u)
+    n1, n2 = u.shape[0], v.shape[0]
     d = q0 - p0
     dxv = np.cross(d, v)
-    for k in range(pt_lidar.shape[0]):
-        dxu = np.cross(d, u[k, :])
-        uxv = np.cross(u[k, :], v)
-        s = dxu / uxv
-        t = dxv / uxv
+    dxu = np.empty([n1, n2])
+    uxv = np.empty([n1, n2])
+    for k in range(n1):
+        dxu[k, :] = np.cross(d, u[k, :])
+        uxv[k, :] = np.cross(u[k, :], v)
 
-        valid = (s >= 0) & (s <= 1) & (t >= 0) & (t <= 1)
+    t = dxv[None, :] / uxv
+    s = dxu / uxv
 
-        if np.any(valid):
-            pt_lidar[k, :] = p0 + t[valid].min() * u[k, :]
-        else:
-            pt_lidar[k, :] = p0 + u[k, :]
+    valid = (s >= 0) & (s <= 1) & (t >= 0) & (t <= 1)
+    t[~valid] = t_default
+
+    t_min = np.nanmin(t, axis=1)
+    pt_lidar = p0 + t_min[:, None] * u
 
     return pt_lidar
 
@@ -128,7 +131,7 @@ def update(i):
 
     return [lines]
 
-ani = FuncAnimation(fig, update, interval=1, blit=True)
+ani = FuncAnimation(fig, update, interval=5, blit=True)
 
 fig.tight_layout()
 plt.show()

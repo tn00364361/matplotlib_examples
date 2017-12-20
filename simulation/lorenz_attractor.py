@@ -1,8 +1,8 @@
+import argparse
 import numpy as np
+from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-from scipy.integrate import solve_ivp
-import argparse
 
 
 '''
@@ -11,7 +11,7 @@ Reference:
 '''
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--no-animate',
+parser.add_argument('--no-animation',
                     dest='animate',
                     help='Disable animation.',
                     action='store_false')
