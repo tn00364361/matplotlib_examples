@@ -20,9 +20,9 @@ parser.add_argument('--save',
                     help='Save the animation as `Lorenz attractor.mp4`',
                     action='store_true')
 parser.add_argument('--duration',
-                    help='Duration for the simulation in seconds. (default: 50.0)',
+                    help='Duration for the simulation in seconds. (default: 45.0)',
                     type=float)
-parser.set_defaults(animate=True, save_video=False, duration=50.0)
+parser.set_defaults(animate=True, save_video=False, duration=45.0)
 
 args = parser.parse_args()
 
@@ -78,19 +78,24 @@ if args.animate:
             lines[k].set_data(x[:2, i1:i2])
             lines[k].set_3d_properties(x[2, i1:i2])
 
-            dots[k].set_data(x[:2, i2 - 1])
-            dots[k].set_3d_properties(x[2, i2 - 1])
+            dots[k].set_data(x[:2, step * i])
+            dots[k].set_3d_properties(x[2, step * i])
 
         #fig.canvas.draw()
 
         return lines + dots
 
-    ani = FuncAnimation(fig, update,
-                        frames=t_eval.size // step, blit=True, interval=dt * step * 1000)
+    ani = FuncAnimation(fig,
+                        update,
+                        frames=t_eval.size // step,
+                        interval=dt * step * 1000,
+                        blit=True)
 
     if args.save_video:
-        dpi = int(1080 / fig.get_size_inches()[1])
-        ani.save('Lorenz attractor.mp4', dpi=dpi, fps=1 / (dt * step), bitrate=4096)
+        ani.save('Lorenz attractor.mp4',
+                 dpi=int(1080 / fig.get_size_inches()[1]),
+                 fps=1 / (dt * step),
+                 bitrate=4096)
 
 
 plt.show()
