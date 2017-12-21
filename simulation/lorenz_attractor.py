@@ -19,10 +19,11 @@ parser.add_argument('--save',
                     dest='save_video',
                     help='Save the animation as `Lorenz attractor.mp4`',
                     action='store_true')
-parser.add_argument('--duration',
+parser.add_argument('--t_span',
                     help='Duration for the simulation in seconds. (default: 45.0)',
-                    type=float)
-parser.set_defaults(animate=True, save_video=False, duration=45.0)
+                    type=float,
+                    default=45.0)
+parser.set_defaults(animate=True, save_video=False)
 
 args = parser.parse_args()
 
@@ -39,7 +40,7 @@ def calc_f(t, x):
 
 # simulate with a very high sampling rate
 dt = 0.001
-t_eval = np.arange(0, args.duration, dt)
+t_eval = np.arange(0, args.t_span, dt)
 
 x_init = np.random.randn(3) + [0, 0, rho - 1]
 x1 = solve_ivp(calc_f, t_eval[[0, -1]], x_init, t_eval=t_eval).y

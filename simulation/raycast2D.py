@@ -125,8 +125,8 @@ def update(i):
     timestamps[-1] = time.time()
 
     pt_lidar = raycast(p0, u, q0, v)
-    lines.set_xdata([[p0[0], pt[0]] for pt in pt_lidar])
-    lines.set_ydata([[p0[1], pt[1]] for pt in pt_lidar])
+    lines.set_xdata([[p0[0], pt[0], np.nan] for pt in pt_lidar])
+    lines.set_ydata([[p0[1], pt[1], np.nan] for pt in pt_lidar])
 
     fps = 1 / np.mean(timestamps[1:] - timestamps[:-1])
 
