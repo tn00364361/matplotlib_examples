@@ -6,7 +6,6 @@ from matplotlib.animation import FuncAnimation
 from shapely.geometry import MultiPolygon, box
 from shapely.affinity import rotate, translate, scale
 from shapely.ops import cascaded_union
-from numba import jit
 
 
 parser = argparse.ArgumentParser()
@@ -15,21 +14,21 @@ parser.add_argument('--num_rays',
                     type=int,
                     default=200)
 parser.add_argument('--range',
-                    help='Maximum range of the LiDAR. (default: 10.0)',
+                    help='Maximum range of the LiDAR. (default: 5.0)',
+                    type=float,
+                    default=5.0)
+parser.add_argument('--map_size',
+                    help='Size of the map. (default: 10.0)',
                     type=float,
                     default=10.0)
-parser.add_argument('--map_size',
-                    help='Size of the map. (default: 20.0)',
-                    type=float,
-                    default=20.0)
 parser.add_argument('--num_items',
                     help='Number of obstacles in the map. (default: 25)',
                     type=int,
                     default=25)
 parser.add_argument('--item_size',
-                    help='Size of the obstacles. (default: 2.0)',
+                    help='Size of the obstacles. (default: 1.0)',
                     type=float,
-                    default=2.0)
+                    default=1.0)
 
 args = parser.parse_args()
 
@@ -62,8 +61,7 @@ def raycast(p0, u, q0, v, t_default=1.0):
     t = dxv[None, :] / uxv
     s = dxu / uxv
 
-    valid = (s >= 0) & (s <= 1) & (t >= 0) & (t <= 1)
-    t[~valid] = t_default
+    t[(s < 0) | (s > 1) | (t < 0) | (t > 1)] = t_default
 
     t_min = np.nanmin(t, axis=1)
     pt_lidar = p0 + t_min[:, None] * u
@@ -71,16 +69,22 @@ def raycast(p0, u, q0, v, t_default=1.0):
     return pt_lidar
 
 
-# generate a random map
-boxes = []
-size = args.item_size
-for k in range(args.num_items):
-    tt = np.random.rand() * 360
-    cc = np.random.rand(2) * args.map_size
-    ss = 1 + np.random.randn() * 0.2
+if args.num_items > 0:
+    # generate a random map
+    boxes = []
+    size = args.item_size
+    for k in range(args.num_items):
+        tt = np.random.rand() * 360
+        cc = np.random.rand(2) * args.map_size
+        ss = 1 + np.random.randn() * 0.2
 
-    boxes.append(box(-size / 2, -size / 2, size / 2, size / 2))
-    boxes[-1] = translate(rotate(scale(boxes[-1], ss, 1 / ss), tt), *cc)
+        boxes.append(box(-size / 2, -size / 2, size / 2, size / 2))
+        boxes[-1] = translate(rotate(scale(boxes[-1], ss, 1 / ss), tt), *cc)
+else:
+    boxes = [box(-args.range,
+                 -args.range,
+                 args.map_size + args.range,
+                 args.map_size + args.range)]
 
 polygons = cascaded_union(boxes)
 if type(polygons) is not MultiPolygon:
