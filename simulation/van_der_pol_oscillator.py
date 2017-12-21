@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from scipy.integrate import solve_ivp
+from scipy.optimize import fixed_point, minimize
 
 
 '''
@@ -50,10 +51,6 @@ def calc_f(t, x):
     x_dot = np.array([x[1], args.mu * (1 - x[0]**2) * x[1] - args.omega**2 * x[0]])
     return x_dot
 
-
-def calc_phi(t, x):
-    return np.arctan2(x[1], x[0])
-
 axlim = 4
 num_cells = 20
 temp = np.linspace(-axlim, axlim, num_cells)
@@ -65,28 +62,41 @@ if args.log_quiver:
     F = F / V * np.log1p(V)
 
 fig1 = plt.figure(1, figsize=(6, 6))
-ax = fig1.add_subplot(1, 1, 1)
-ax.quiver(X[0, ...], X[1, ...], F[0, ...], F[1, ...], pivot='mid')
+ax1 = fig1.add_subplot(1, 1, 1)
+ax1.quiver(X[0, ...], X[1, ...], F[0, ...], F[1, ...], pivot='mid')
 
-ax.axis('scaled')
-ax.axis([-axlim, axlim, -axlim, axlim])
+ax1.axis('scaled')
+ax1.axis([-axlim, axlim, -axlim, axlim])
 
 fig1.tight_layout()
 
-# approximate the limit cycle (steady-state trajectory)
-dt = 0.02
-t_eval = np.arange(0, 1000, dt)
+# Numerically calculate the limit cycle (steady-state trajectory)
+dt = 0.001
+t_eval = np.arange(0, 100 / args.omega, dt)
 
-event = calc_phi
-event.terminal = False
+def event(t, x):
+    return x[1]
+
+event.terminal = True
 event.direction = -1
-sol = solve_ivp(calc_f, t_eval[[0, -1]], [2, 0], t_eval=t_eval, events=event)
-t_event = sol.t_events[0]
-last_cycle = (t_eval >= t_event[-2] - dt) & (t_eval <= t_event[-1] + dt)
-x_ss = sol.y[:, last_cycle]
-t_ss = t_eval[last_cycle]
 
-ax.plot(x_ss[0, :], x_ss[1, :], color=np.ones(3) * 0.5)
+eps = np.finfo(np.float64).eps
+
+def poincare_map(d):
+    sol = solve_ivp(calc_f, t_eval[[0, -1]], [d, -eps], t_eval=t_eval, events=event)
+    return sol.y[0, -1]
+
+d_fp = fixed_point(poincare_map, 2)
+
+
+sol = solve_ivp(calc_f, t_eval[[0, -1]], [d_fp, -eps], t_eval=t_eval, events=event)
+x_ss = sol.y
+x_ss[:, 0] = 0.5 * (x_ss[:, 0] + x_ss[:, -1])
+x_ss[:, -1] = x_ss[:, 0]
+print('Fixed point at x = {}'.format(x_ss[:, 0]))
+print('Period = {}'.format(sol.t_events[0][0]))
+
+ax1.plot(x_ss[0, :], x_ss[1, :], color=np.ones(3) * 0.5)
 
 
 # solve the ODE given `num_sim` initial conditions
@@ -102,27 +112,23 @@ lines, dots = [], []
 colors = ['C{:d}'.format(i) for i in range(10)]
 for k in range(len(colors)):
     clr = colors[k % len(colors)]
-    lines.append(ax.plot([], [], lw=4, color=clr)[0])
-    dots.append(ax.plot([], [], '.', ms=16, color=clr)[0])
+    lines.append(ax1.plot([], [], lw=4, color=clr)[0])
+    dots.append(ax1.plot([], [], '.', ms=16, color=clr)[0])
 
 
+step = int(0.02 / dt)
 def update(i):
-    print('t = {:.4f}'.format(t_eval[i]))
-    i1, i2 = max(0, i - int(0.1 / dt)), i + 1
+    #print('t = {:.4f}'.format(t_eval[step * i]))
+    i1, i2 = max(0, step * i - int(0.1 / dt)), step * i + 1
 
     for k in range(len(colors)):
         idx = ((np.arange(args.num_sim) + k) % len(colors)) == 0
 
-        data = np.empty([i2 - i1 + 1, np.sum(idx)])
-        data[-1, :] = np.nan
+        lines[k].set_xdata([np.append(arr, np.nan) for arr in x[0, i1:i2, idx]])
+        lines[k].set_ydata([np.append(arr, np.nan) for arr in x[1, i1:i2, idx]])
 
-        data[:(i2 - i1), :] = x[0, ...][i1:i2, idx]
-        lines[k].set_xdata(data.copy().T)
-        data[:(i2 - i1), :] = x[1, ...][i1:i2, idx]
-        lines[k].set_ydata(data.copy().T)
-
-        dots[k].set_xdata(x[0, i, idx])
-        dots[k].set_ydata(x[1, i, idx])
+        dots[k].set_xdata(x[0, step * i, idx])
+        dots[k].set_ydata(x[1, step * i, idx])
 
     return lines + dots
 
@@ -130,8 +136,8 @@ def update(i):
 if args.animate:
     ani = FuncAnimation(fig1,
                         update,
-                        frames=t_eval.size,
-                        interval=dt * 1000,
+                        frames=t_eval.size // step,
+                        interval=dt * step * 1000,
                         blit=True)
 
     if args.save_video:

@@ -37,8 +37,10 @@ print(verts[:, 0].min(), verts[:, 0].max())
 fig = plt.figure(figsize=(8, 8))
 ax = fig.add_subplot(1, 1, 1, projection='3d')
 
-ax.plot_trisurf(verts[:, 0], verts[:, 1], verts[:, 2], triangles=faces,
-    shade=True, color=0.5 * np.ones(3))
+ax.plot_trisurf(verts[:, 0], verts[:, 1], verts[:, 2],
+                triangles=faces,
+                shade=True,
+                color=0.5 * np.ones(3))
 
 ax.set_xlim(-lim, lim)
 ax.set_ylim(-lim, lim)

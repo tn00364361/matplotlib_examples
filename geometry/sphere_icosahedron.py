@@ -6,19 +6,16 @@ from mpl_toolkits.mplot3d import Axes3D
 np.random.seed(9527)
 
 t = 0.5 * (1 + np.sqrt(5))
-vtxs = np.array([
-            [-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0],
-            [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t],
-            [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]
-        ])
+vtxs = np.array([[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0],
+                 [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t],
+                 [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]])
 vtxs /= np.sqrt(1 + t**2)
 
-faces = np.array([
-            [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [0, 11, 5],
-            [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
-            [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
-            [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]
-        ], dtype=np.uint64)
+faces = np.array([[0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [0, 11, 5],
+                  [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+                  [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+                  [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]],
+                 dtype=np.uint64)
 
 
 print('%d nodes, %d faces' % (vtxs.shape[0], faces.shape[0]))
@@ -45,12 +42,10 @@ for ni in range(num_iter):
 
 
         faces_new[np.all(faces_new == f, axis=1), :] = m
-        faces_new = np.vstack((
-                        faces_new,
-                        [f[0], m[0], m[2]],
-                        [f[1], m[1], m[0]],
-                        [f[2], m[2], m[1]])
-                    ).astype(np.uint64)
+        faces_new = np.vstack((faces_new,
+                               [f[0], m[0], m[2]],
+                               [f[1], m[1], m[0]],
+                               [f[2], m[2], m[1]])).astype(np.uint64)
 
     faces = faces_new
 
@@ -61,8 +56,10 @@ fig = plt.figure(1, figsize=(8, 8))
 ax = fig.add_subplot(1, 1, 1, projection='3d')
 ax.axis('scaled')
 
-ax.plot_trisurf(vtxs[:, 0], vtxs[:, 1], vtxs[:, 2], triangles=faces,
-    shade=True, color=0.5 * np.ones(3))
+ax.plot_trisurf(vtxs[:, 0], vtxs[:, 1], vtxs[:, 2],
+                triangles=faces,
+                shade=True,
+                color=0.5 * np.ones(3))
 
 axlim = 1.1
 ax.set_xlim(-axlim, axlim)
@@ -74,9 +71,3 @@ ax.set_zlabel('z')
 ax.set_title('# Iteration = %d' % num_iter)
 fig.tight_layout()
 plt.show()
-
-if 0:
-    if rock:
-        savefig('rock_' + str(num_iter) + '.png', dpi=120)
-    else:
-        savefig(str(num_iter) + '.png', dpi=120)

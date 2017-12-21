@@ -10,9 +10,9 @@ from shapely.ops import cascaded_union
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--num_rays',
-                    help='Number of rays of the LiDAR. (default: 200)',
+                    help='Number of rays of the LiDAR. (default: 250)',
                     type=int,
-                    default=200)
+                    default=250)
 parser.add_argument('--range',
                     help='Maximum range of the LiDAR. (default: 5.0)',
                     type=float,
@@ -106,7 +106,7 @@ ax.axis('scaled')
 ax.axis([0, args.map_size, 0, args.map_size])
 
 
-lines, = ax.plot([], [], lw=0.2)
+lines, = ax.plot([], [], lw=0.5)
 
 # center of the LiDAR
 p0 = np.array([args.map_size / 2] * 2)
