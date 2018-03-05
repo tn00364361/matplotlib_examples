@@ -6,10 +6,10 @@ from mpl_toolkits.mplot3d import Axes3D
 np.random.seed(9527)
 
 t = 0.5 * (1 + np.sqrt(5))
-vtxs = np.array([[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0],
-                 [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t],
-                 [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]])
-vtxs /= np.sqrt(1 + t**2)
+vertices = np.array([[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0],
+                     [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t],
+                     [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]])
+vertices /= np.sqrt(1 + t**2)
 
 faces = np.array([[0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [0, 11, 5],
                   [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
@@ -18,7 +18,7 @@ faces = np.array([[0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [0, 11, 5],
                  dtype=np.uint64)
 
 
-print('%d nodes, %d faces' % (vtxs.shape[0], faces.shape[0]))
+print('%d nodes, %d faces' % (vertices.shape[0], faces.shape[0]))
 num_iter = 3
 for ni in range(num_iter):
     faces_new = faces.copy()
@@ -29,15 +29,16 @@ for ni in range(num_iter):
             j = ((i + 1) % 3)
             c_ij = (f[i] == mid_nodes[:, 0]) & (f[j] == mid_nodes[:, 1])
             c_ji = (f[j] == mid_nodes[:, 0]) & (f[i] == mid_nodes[:, 1])
-            if np.any(c_ij | c_ji):
-                m[i] = mid_nodes[c_ij | c_ji, -1]
+            idx = c_ij | c_ji
+            if np.any(idx):
+                m[i] = mid_nodes[idx, -1]
             else:
-                p_mid = np.mean(vtxs[[f[i], f[j]], :], axis=0)
+                p_mid = np.mean(vertices[[f[i], f[j]], :], axis=0)
                 p_mid /= np.linalg.norm(p_mid)
 
-                m[i] = vtxs.shape[0]
+                m[i] = vertices.shape[0]
 
-                vtxs = np.vstack((vtxs, p_mid[np.newaxis, :]))
+                vertices = np.vstack((vertices, p_mid[np.newaxis, :]))
                 mid_nodes = np.vstack((mid_nodes, [f[i], f[j], m[i]]))
 
 
@@ -49,14 +50,14 @@ for ni in range(num_iter):
 
     faces = faces_new
 
-    print('%d nodes, %d faces' % (vtxs.shape[0], faces.shape[0]))
+    print('%d nodes, %d faces' % (vertices.shape[0], faces.shape[0]))
 
 
 fig = plt.figure(1, figsize=(8, 8))
 ax = fig.add_subplot(1, 1, 1, projection='3d')
 ax.axis('scaled')
 
-ax.plot_trisurf(vtxs[:, 0], vtxs[:, 1], vtxs[:, 2],
+ax.plot_trisurf(vertices[:, 0], vertices[:, 1], vertices[:, 2],
                 triangles=faces,
                 shade=True,
                 color=0.5 * np.ones(3))

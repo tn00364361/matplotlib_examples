@@ -1,9 +1,10 @@
+#! /usr/bin/python3
 import time
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from shapely.geometry import MultiPolygon, box
+from shapely.geometry import MultiPolygon, box, Point
 from shapely.affinity import rotate, translate, scale
 from shapely.ops import cascaded_union
 
@@ -22,9 +23,9 @@ parser.add_argument('--map_size',
                     type=float,
                     default=10.0)
 parser.add_argument('--num_items',
-                    help='Number of obstacles in the map. (default: 25)',
+                    help='Number of obstacles in the map. (default: 30)',
                     type=int,
-                    default=25)
+                    default=30)
 parser.add_argument('--item_size',
                     help='Size of the obstacles. (default: 1.0)',
                     type=float,
@@ -33,7 +34,7 @@ parser.add_argument('--item_size',
 args = parser.parse_args()
 
 
-def raycast(p0, u, q0, v, t_default=1.0):
+def raycast(p0, u, q0, v, uxv=None, t_default=np.nan):
     '''
     Input:
     *   p0
@@ -49,57 +50,58 @@ def raycast(p0, u, q0, v, t_default=1.0):
         (n2, 2)
         Displacement vectors of other `n2` line segments.
     '''
-    n1, n2 = u.shape[0], v.shape[0]
     d = q0 - p0
-    dxv = np.cross(d, v)
-    dxu = np.empty([n1, n2])
-    uxv = np.empty([n1, n2])
-    for k in range(n1):
-        dxu[k, :] = np.cross(d, u[k, :])
-        uxv[k, :] = np.cross(u[k, :], v)
+    dxv = np.cross(d, v)[None, :]
+    dxu = np.vstack([np.cross(d, aa) for aa in u])
 
-    t = dxv[None, :] / uxv
+    if uxv is None:
+        uxv = np.vstack([np.cross(aa, v) for aa in u])
+
+    t = dxv / uxv
     s = dxu / uxv
 
     t[(s < 0) | (s > 1) | (t < 0) | (t > 1)] = t_default
 
-    t_min = np.nanmin(t, axis=1)
-    pt_lidar = p0 + t_min[:, None] * u
-
-    return pt_lidar
+    return p0 + np.nanmin(t, axis=1, keepdims=True) * u
 
 
 if args.num_items > 0:
     # generate a random map
-    boxes = []
-    size = args.item_size
+    obstacles = []
+    w = args.item_size / 2
     for k in range(args.num_items):
-        tt = np.random.rand() * 360
-        cc = np.random.rand(2) * args.map_size
-        ss = 1 + np.random.randn() * 0.2
+        if np.random.rand() > 0.5:
+            obstacles.append(box(-w, -w, w, w))
+        else:
+            obstacles.append(Point(0, 0).buffer(w))
 
-        boxes.append(box(-size / 2, -size / 2, size / 2, size / 2))
-        boxes[-1] = translate(rotate(scale(boxes[-1], ss, 1 / ss), tt), *cc)
+        ss = 1 + np.random.randn() * 0.2
+        obstacles[-1] = scale(obstacles[-1], ss, 1 / ss)
+
+        obstacles[-1] = rotate(obstacles[-1], np.random.rand() * 360)
+
+        cc = np.random.rand(2) * args.map_size
+        obstacles[-1] = translate(obstacles[-1], *cc)
 else:
-    boxes = [box(-args.range,
+    obstacles = [box(-args.range,
                  -args.range,
                  args.map_size + args.range,
                  args.map_size + args.range)]
 
-polygons = cascaded_union(boxes)
-if type(polygons) is not MultiPolygon:
-    polygons = MultiPolygon([polygons])
+obstacles = cascaded_union(obstacles)
+if type(obstacles) is not MultiPolygon:
+    obstacles = MultiPolygon([obstacles])
 
 # start (q0) and end (q1) points for all verticies
-q0 = np.vstack([np.asarray(p.exterior.coords)[:-1, :] for p in polygons])
-q1 = np.vstack([np.asarray(p.exterior.coords)[1:, :] for p in polygons])
+q0 = np.vstack([np.asarray(obj.exterior.coords)[:-1, :] for obj in obstacles])
+q1 = np.vstack([np.asarray(obj.exterior.coords)[1:, :] for obj in obstacles])
 v = q1 - q0
 
 fig = plt.figure(1, figsize=(8, 8))
 ax = fig.add_subplot(1, 1, 1)
 
-for p in polygons:
-    x, y = p.exterior.coords.xy
+for obj in obstacles:
+    x, y = obj.exterior.coords.xy
     ax.plot(x, y, 'k', lw=1)
 
 ax.axis('scaled')
@@ -107,11 +109,13 @@ ax.axis([0, args.map_size, 0, args.map_size])
 
 
 lines, = ax.plot([], [], lw=0.5)
+dot, = ax.plot([], [], 'r+')
 
 # center of the LiDAR
 p0 = np.array([args.map_size / 2] * 2)
 theta = np.linspace(0, 2 * np.pi, args.num_rays, endpoint=False)
 u = args.range * np.vstack([np.cos(theta), np.sin(theta)]).T
+uxv = np.vstack([np.cross(aa, v) for aa in u])
 
 def on_move(event):
     if event.xdata is not None and event.ydata is not None:
@@ -121,21 +125,25 @@ fig.canvas.mpl_connect('motion_notify_event', on_move)
 
 timestamps = np.empty(10)
 def update(i):
-    timestamps[:-1] = timestamps[1:]
-    timestamps[-1] = time.time()
+    timestamps[1:] = timestamps[:-1]
+    timestamps[0] = time.time()
 
-    pt_lidar = raycast(p0, u, q0, v)
-    lines.set_xdata([[p0[0], pt[0], np.nan] for pt in pt_lidar])
-    lines.set_ydata([[p0[1], pt[1], np.nan] for pt in pt_lidar])
+    points = raycast(p0, u, q0, v, uxv=uxv)
+    step = max(points.shape[0] // 200, 1)
+    lines.set_xdata([[p0[0], pt[0], np.nan] for pt in points[::step]])
+    lines.set_ydata([[p0[1], pt[1], np.nan] for pt in points[::step]])
 
-    fps = 1 / np.mean(timestamps[1:] - timestamps[:-1])
+    dot.set_xdata(p0[0])
+    dot.set_ydata(p0[1])
+
+    dt = np.mean(timestamps[:-1] - timestamps[1:])
 
     if i >= timestamps.size:
-        print('average fps = {:.4f}'.format(fps))
+        print('average fps = {:.4f}'.format(1 / dt))
 
-    return [lines]
+    return [lines, dot]
 
-ani = FuncAnimation(fig, update, interval=5, blit=True)
+ani = FuncAnimation(fig, update, interval=0, blit=True)
 
 fig.tight_layout()
 plt.show()
