@@ -19,15 +19,21 @@ parser.add_argument('--dt',
                     help='Sampling time in seconds. (default: 0.02)',
                     type=float,
                     default=0.02)
+parser.add_argument('--Nx',
+                    help='Number of samples in x. (default: 256)',
+                    type=int,
+                    default=256)
+parser.add_argument('--width',
+                    help='Half of the width in x. (default: 6.0)',
+                    type=float,
+                    default=6.0)
 
 
 args = parser.parse_args()
 
 Nt = int(args.duration // args.dt) + 1
-t = np.linspace(0, args.duration, Nt)
 
-Nx = 256
-x = np.linspace(-1, 1, Nx) * 2 * np.pi
+x = np.linspace(-1, 1, args.Nx) * args.width
 
 # flow
 f = np.sin(x)
@@ -38,12 +44,12 @@ g = np.zeros_like(x) + 0.2
 F = toeplitz(fft(f))
 G = toeplitz(fft(g))
 
-omega = fftfreq(Nx, d=x[1] - x[0]) * 2 * np.pi
+omega = fftfreq(args.Nx, d=x[1] - x[0]) * 2 * np.pi
 Dx = 1j * omega
 Dxx = -omega**2
 
 Ac = Dxx.reshape([-1, 1]) * G - Dx.reshape([-1, 1]) * F
-Ac /= Nx
+Ac /= args.Nx
 
 Ad = expm(Ac * args.dt)
 
@@ -59,23 +65,23 @@ fig.tight_layout()
 
 line, = ax.plot(x, np.nan * x)
 
-P = np.empty(Nx, dtype=complex)
+P = np.empty(args.Nx, dtype=complex)
 timestamps = np.zeros(10)
 
 
 def update(i):
 
     if i == 0:
-        p0 = norm.pdf(x, np.random.randn(), 0.5 + np.random.rand())
-        P[:] = fft(p0)
-
-    P[:] = np.dot(Ad, P)
-    p = ifft(P).real
+        p = norm.pdf(x, np.random.randn(), 0.5 + np.random.rand())
+        P[:] = fft(p)
+    else:
+        P[:] = np.dot(Ad, P)
+        p = ifft(P).real
 
     timestamps[1:] = timestamps[:-1]
     timestamps[0] = time.time()
     freq = 1 / np.mean(timestamps[:-1] - timestamps[1:])
-    print('\raverage FPS = {:.4f}'.format(freq), end='')
+    print('average FPS = {:.4f}'.format(freq), end='\r')
 
     line.set_ydata(p)
 

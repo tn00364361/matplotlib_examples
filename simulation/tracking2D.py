@@ -63,7 +63,7 @@ def update(i):
 
     if i > timestamps.size:
         freq = 1 / np.mean(timestamps[:-1] - timestamps[1:])
-        print('\raverage fps = {:.4f}'.format(freq), end='')
+        print('average fps = {:.4f}'.format(freq), end='\r')
 
     x[:, 1:] = x[:, :-1]
     x[:, 0] = x_des + Ad @ (x[:, 0] - x_des)

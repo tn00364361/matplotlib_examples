@@ -112,7 +112,7 @@ lines, = ax.plot([], [], lw=0.5)
 dot, = ax.plot([], [], 'r+')
 
 # center of the LiDAR
-p0 = np.array([args.map_size / 2] * 2)
+p0 = np.ones(2) * args.map_size / 2
 theta = np.linspace(0, 2 * np.pi, args.num_rays, endpoint=False)
 u = args.range * np.vstack([np.cos(theta), np.sin(theta)]).T
 uxv = np.vstack([np.cross(aa, v) for aa in u])
@@ -143,7 +143,7 @@ def update(i):
     dt = np.mean(timestamps[:-1] - timestamps[1:])
 
     if i >= timestamps.size:
-        print('\raverage fps = {:.4f}'.format(1 / dt), end='')
+        print('average fps = {:.4f}'.format(1 / dt), end='\r')
 
     return [lines, dot]
 
