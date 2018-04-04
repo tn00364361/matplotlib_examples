@@ -29,6 +29,8 @@ args = parser.parse_args()
 
 
 rho, sigma, beta = 28, 10, 8 / 3
+
+
 def calc_f(t, x):
     x_dot = np.array([
         sigma * (x[1] - x[0]),
@@ -73,7 +75,6 @@ if args.animate:
 
     def update(i):
         i1, i2 = max(0, step * i - int(0.1 / dt)), step * i + 1
-        #print(t_eval[i2 - 1])
 
         for k, x in enumerate([x1, x2]):
             lines[k].set_data(x[:2, i1:i2])
@@ -81,8 +82,6 @@ if args.animate:
 
             dots[k].set_data(x[:2, step * i])
             dots[k].set_3d_properties(x[2, step * i])
-
-        #fig.canvas.draw()
 
         return lines + dots
 

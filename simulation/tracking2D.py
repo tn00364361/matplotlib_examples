@@ -46,20 +46,24 @@ fig.tight_layout()
 x = np.zeros([4, int(0.1 / args.dt)])
 x_des = np.zeros(4)
 
+
 def on_move(event):
     if event.xdata is not None and event.ydata is not None:
         x_des[[0, 2]] = [event.xdata, event.ydata]
 
+
 fig.canvas.mpl_connect('motion_notify_event', on_move)
 
 timestamps = np.empty(10)
+
+
 def update(i):
     timestamps[1:] = timestamps[:-1]
     timestamps[0] = time.time()
 
     if i > timestamps.size:
-        dt = np.mean(timestamps[:-1] - timestamps[1:])
-        print('average fps = {:.4f}'.format(1 / dt))
+        freq = 1 / np.mean(timestamps[:-1] - timestamps[1:])
+        print('\raverage fps = {:.4f}'.format(freq), end='')
 
     x[:, 1:] = x[:, :-1]
     x[:, 0] = x_des + Ad @ (x[:, 0] - x_des)
@@ -77,8 +81,8 @@ def update(i):
         line.set_color('C0')
         dot.set_color('C0')
 
-
     return [dot, line]
+
 
 ani = FuncAnimation(fig, update, interval=1000 * args.dt, blit=True)
 

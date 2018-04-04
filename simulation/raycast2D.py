@@ -35,7 +35,7 @@ args = parser.parse_args()
 
 
 def raycast(p0, u, q0, v, uxv=None, t_default=np.nan):
-    '''
+    """
     Input:
     *   p0
         (2)
@@ -49,7 +49,7 @@ def raycast(p0, u, q0, v, uxv=None, t_default=np.nan):
     *   v
         (n2, 2)
         Displacement vectors of other `n2` line segments.
-    '''
+    """
     d = q0 - p0
     dxv = np.cross(d, v)[None, :]
     dxu = np.vstack([np.cross(d, aa) for aa in u])
@@ -92,7 +92,7 @@ obstacles = cascaded_union(obstacles)
 if type(obstacles) is not MultiPolygon:
     obstacles = MultiPolygon([obstacles])
 
-# start (q0) and end (q1) points for all verticies
+# start (q0) and end (q1) points for all vertices
 q0 = np.vstack([np.asarray(obj.exterior.coords)[:-1, :] for obj in obstacles])
 q1 = np.vstack([np.asarray(obj.exterior.coords)[1:, :] for obj in obstacles])
 v = q1 - q0
@@ -105,8 +105,8 @@ for obj in obstacles:
     ax.plot(x, y, 'k', lw=1)
 
 ax.axis('scaled')
-ax.axis([0, args.map_size, 0, args.map_size])
-
+ax.set_xlim(0, args.map_size)
+ax.set_ylim(0, args.map_size)
 
 lines, = ax.plot([], [], lw=0.5)
 dot, = ax.plot([], [], 'r+')
@@ -117,13 +117,17 @@ theta = np.linspace(0, 2 * np.pi, args.num_rays, endpoint=False)
 u = args.range * np.vstack([np.cos(theta), np.sin(theta)]).T
 uxv = np.vstack([np.cross(aa, v) for aa in u])
 
+
 def on_move(event):
     if event.xdata is not None and event.ydata is not None:
         p0[:] = [event.xdata, event.ydata]
 
+
 fig.canvas.mpl_connect('motion_notify_event', on_move)
 
 timestamps = np.empty(10)
+
+
 def update(i):
     timestamps[1:] = timestamps[:-1]
     timestamps[0] = time.time()
@@ -139,9 +143,10 @@ def update(i):
     dt = np.mean(timestamps[:-1] - timestamps[1:])
 
     if i >= timestamps.size:
-        print('average fps = {:.4f}'.format(1 / dt))
+        print('\raverage fps = {:.4f}'.format(1 / dt), end='')
 
     return [lines, dot]
+
 
 ani = FuncAnimation(fig, update, interval=0, blit=True)
 
