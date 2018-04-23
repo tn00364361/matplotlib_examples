@@ -25,7 +25,7 @@ parser.add_argument('--save',
                     help='Save the animation as `Lorenz attractor.mp4`',
                     action='store_true')
 parser.add_argument('--t_span',
-                    help='Duration for the simulation in seconds. (default: 45.0)',
+                    help='Duration for the simulation. (default: 45.0)',
                     type=float,
                     default=45.0)
 parser.set_defaults(animate=True, save_video=False)
@@ -106,6 +106,5 @@ if args.animate:
                  dpi=int(1080 / fig.get_size_inches()[1]),
                  fps=1 / (dt * step),
                  bitrate=4096)
-
 
 plt.show()

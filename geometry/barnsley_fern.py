@@ -15,11 +15,13 @@ param = np.array([
 ])
 prob = np.array([0.01, 0.85, 0.07, 0.07])
 
+
 def f(x):
     idx = np.random.choice(4, p=prob)
-    a, b, c, d, e, f = param[idx, :]
+    coeffs = param[idx, :]
 
-    return np.array([[a, b], [c, d]]) @ x + np.array([e, f])
+    return coeffs[:4].reshape([2, 2]) @ x + coeffs[4:]
+
 
 num_iter = 100000
 x = np.zeros([2, num_iter])

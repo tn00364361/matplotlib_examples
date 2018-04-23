@@ -41,7 +41,6 @@ for ni in range(num_iter):
                 vertices = np.vstack((vertices, p_mid[np.newaxis, :]))
                 mid_nodes = np.vstack((mid_nodes, [f[i], f[j], m[i]]))
 
-
         faces_new[np.all(faces_new == f, axis=1), :] = m
         faces_new = np.vstack((faces_new,
                                [f[0], m[0], m[2]],
