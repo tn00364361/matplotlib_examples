@@ -12,12 +12,10 @@ import shapely.affinity as aff
 import shapely.ops as ops
 
 
-tol = np.sqrt(np.finfo(float).eps)
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--num_rays',
                     help='Number of rays to simulate. (default: 1200)',
-                    type=int, default=1200)
+                    type=int, default=1800)
 parser.add_argument('--range',
                     help='Maximum range of the LiDAR. (default: 25.0)',
                     type=float, default=25.0)
@@ -62,7 +60,7 @@ def gen_obstacle(seed):
         r = np.sqrt(args.item_size / np.pi)
         obstacle = geo.Point(0, 0).buffer(r, resolution=4)
 
-    ss = 1 + random.rand()
+    ss = np.sqrt(np.abs(random.randn()) + 1)
     obstacle = aff.scale(obstacle, ss, 1 / ss)
 
     obstacle = aff.rotate(obstacle, random.rand() * 360)
@@ -125,16 +123,16 @@ def raycast(pt_lidar_, u_):
         (n1, 2)
         Displacement vectors for the `n1` LiDAR rays.
     """
-    d = q0 - pt_lidar_
+    d = q0 - pt_lidar_[None, :]
+
+    d0, d1 = d[:, 0][None, :], d[:, 1][None, :]
+    u0, u1 = u_[:, 0][:, None], u_[:, 1][:, None]
+    v0, v1 = v[:, 0][None, :], v[:, 1][None, :]
     dxv = np.cross(d, v)[None, :]
-    dxu = np.vstack([np.cross(d, aa) for aa in u_])
+    dxu = d0 * u1 - d1 * u0
+    uxv = u0 * v1 - u1 * v0
 
-    uxv = np.vstack([np.cross(aa, v) for aa in u_])
-    uxv[uxv == 0] = tol
-
-    t = dxv / uxv
-    s = dxu / uxv
-
+    t, s = dxv / uxv, dxu / uxv
     t[(s < 0) | (s > 1) | (t < 0) | (t > 1)] = 1
     t_min = np.min(t, axis=1, keepdims=True)
 
@@ -142,7 +140,7 @@ def raycast(pt_lidar_, u_):
     noise = args.sigma / args.range * random.randn(*t_min[t_min < 1].shape)
     t_min[idx_valid] += noise
 
-    return idx_valid, pt_lidar_ + t_min * u_
+    return idx_valid, pt_lidar_[None, :] + t_min * u_
 
 
 def on_move(event):
