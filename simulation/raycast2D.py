@@ -161,13 +161,13 @@ def raycast(pt_lidar_, u_):
 
     t, s = dxv / uxv, dxu / uxv
     t[(s < 0) | (s > 1) | (t < 0) | (t > 1)] = 1
-    t_min = np.min(t, axis=1, keepdims=True)
+    t_min = np.min(t, axis=1)
 
     idx_valid = t_min < 1
     noise = args.sigma / args.range * random.randn(*t_min[idx_valid].shape)
     t_min[idx_valid] += noise
 
-    return idx_valid, pt_lidar_[None, :] + t_min * u_
+    return idx_valid, pt_lidar_[None, :] + t_min[:, None] * u_
 
 
 def on_move(event):
@@ -187,11 +187,11 @@ def update(i):
     center.set_ydata(pt_lidar[1])
 
     outputs = pool.starmap(raycast, input_args)
-    idx = np.vstack([o[0] for o in outputs]).flatten()
+    idx = np.hstack([o[0] for o in outputs])
     xy = np.vstack([o[1] for o in outputs])
     patch.set_xy(xy)
 
-    skip = 1#max(np.round(np.sum(idx) / 1000).astype(int), 1)
+    skip = max(np.round(np.sum(idx) / 1000).astype(int), 1)
     points.set_xdata(xy[idx, 0][::skip])
     points.set_ydata(xy[idx, 1][::skip])
 
