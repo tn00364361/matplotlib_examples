@@ -14,7 +14,7 @@ import shapely.ops as ops
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--num_rays',
-                    help='Number of rays to simulate. (default: 1200)',
+                    help='Number of rays to simulate. (default: 1800)',
                     type=int, default=1800)
 parser.add_argument('--range',
                     help='Maximum range of the LiDAR. (default: 25.0)',
@@ -32,7 +32,7 @@ parser.add_argument('--item_size',
                     help='Size (area) of the obstacles. (default: 25.0)',
                     type=float, default=25.0)
 parser.add_argument('--num_proc',
-                    help='Number of threads. If non-positive, use all threads. (default: 0)',
+                    help='Number of threads. If non-positive, use all the threads. (default: 0)',
                     type=int, default=0)
 parser.add_argument('--color',
                     help='Color of the LiDAR. (default: C0)',
@@ -54,11 +54,11 @@ def gen_obstacle(seed):
     random.seed(seed)
 
     if random.rand() > 0.5:
-        w = np.sqrt(args.item_size  / 4)
+        w = np.sqrt(args.item_size / 4)
         obstacle = geo.box(-w, -w, w, w)
     else:
         r = np.sqrt(args.item_size / np.pi)
-        obstacle = geo.Point(0, 0).buffer(r, resolution=4)
+        obstacle = geo.Point(0, 0).buffer(r, resolution=64)
 
     ss = np.sqrt(np.abs(random.randn()) + 1)
     obstacle = aff.scale(obstacle, ss, 1 / ss)
@@ -79,21 +79,43 @@ obstacles = ops.cascaded_union(obstacles)
 if type(obstacles) is not geo.MultiPolygon:
     obstacles = geo.MultiPolygon([obstacles])
 
-# start (q0) and end (q1) points for all vertices
-q0 = np.vstack([np.asarray(o.exterior.coords)[:-1, :] for o in obstacles])
-q1 = np.vstack([np.asarray(o.exterior.coords)[1:, :] for o in obstacles])
-v = q1 - q0
+obstacles = obstacles.simplify(args.map_size * 1e-3)
+
+
+def get_vertices(polygon):
+    xy_ext = np.asarray(polygon.exterior.coords.xy)
+
+    xy_int_start, xy_int_end = [], []
+    for i in polygon.interiors:
+        xy = np.asarray(i.coords.xy)
+        xy_int_start.append(xy[:, :-1])
+        xy_int_end.append(xy[:, 1:])
+
+    xy_start = np.hstack([xy_ext[:, :-1]] + xy_int_start).T
+    xy_end = np.hstack([xy_ext[:, 1:]] + xy_int_end).T
+    return xy_start, xy_end
+
+
+with Pool(num_proc) as pool:
+    outputs = pool.map(get_vertices, obstacles)
+
+# start and end points for all vertices
+q_start = np.vstack([o[0] for o in outputs])
+q_end = np.vstack([o[1] for o in outputs])
+v = q_end - q_start
 
 # center of the LiDAR
-pt_lidar = np.ones(2) * args.map_size / 2
+pt_lidar = random.rand(2) * args.map_size
+# while geo.Point(*pt_lidar).within(obstacles):
+#     pt_lidar = random.rand(2) * args.map_size
+
 theta = np.linspace(0, 2 * np.pi, args.num_rays, endpoint=False)
 u = args.range * np.vstack([np.cos(theta), np.sin(theta)]).T
 
 input_args = []
-num_pt_per_proc = args.num_rays // num_proc
+num_pt_per_proc = np.ceil(args.num_rays / num_proc).astype(int)
 for k in range(num_proc):
     aa = u[(k * num_pt_per_proc):((k + 1) * num_pt_per_proc)]
-    # aa = u[k::num_proc]
     input_args.append((pt_lidar, aa))
 
 
@@ -101,11 +123,16 @@ fig = plt.figure(1, figsize=(6, 6))
 ax = fig.add_subplot(1, 1, 1)
 
 for o in obstacles:
-    ax.plot(*o.exterior.coords.xy, color='k', lw=0.5)
+    xy = np.asarray(o.exterior.coords.xy).T
+    ax.add_patch(patches.Polygon(xy, fc=np.ones(3) * 0.5, ec='k', lw=0.5))
+
+    for i in o.interiors:
+        xy = np.asarray(i.coords.xy).T
+        ax.add_patch(patches.Polygon(xy, fc='w', ec='r', lw=0.5))
 
 center, = ax.plot([], [], '+', color=args.color, ms=16)
 points, = ax.plot([], [], '.', color=args.color, ms=4)
-poly_obsv = patches.Polygon(np.empty([1, 2]), fc=args.color, alpha=0.2)
+poly_obsv = patches.Polygon(np.empty([1, 2]), fc=args.color, alpha=0.5)
 patch = ax.add_patch(poly_obsv)
 
 ax.axis('scaled')
@@ -120,24 +147,24 @@ def raycast(pt_lidar_, u_):
         (2)
         Center of the LiDAR.
     *   u_
-        (n1, 2)
-        Displacement vectors for the `n1` LiDAR rays.
+        (N, 2)
+        Displacement vectors for the `N` LiDAR rays.
     """
-    d = q0 - pt_lidar_[None, :]
+    d = q_start - pt_lidar_[None, :]
 
-    d0, d1 = d[:, 0][None, :], d[:, 1][None, :]
-    u0, u1 = u_[:, 0][:, None], u_[:, 1][:, None]
-    v0, v1 = v[:, 0][None, :], v[:, 1][None, :]
+    d0, d1 = d[:, 0], d[:, 1]
+    u0, u1 = u_[:, 0], u_[:, 1]
+    v0, v1 = v[:, 0], v[:, 1]
     dxv = np.cross(d, v)[None, :]
-    dxu = d0 * u1 - d1 * u0
-    uxv = u0 * v1 - u1 * v0
+    dxu = d0[None, :] * u1[:, None] - d1[None, :] * u0[:, None]
+    uxv = u0[:, None] * v1[None, :] - u1[:, None] * v0[None, :]
 
     t, s = dxv / uxv, dxu / uxv
     t[(s < 0) | (s > 1) | (t < 0) | (t > 1)] = 1
     t_min = np.min(t, axis=1, keepdims=True)
 
     idx_valid = t_min < 1
-    noise = args.sigma / args.range * random.randn(*t_min[t_min < 1].shape)
+    noise = args.sigma / args.range * random.randn(*t_min[idx_valid].shape)
     t_min[idx_valid] += noise
 
     return idx_valid, pt_lidar_[None, :] + t_min * u_
@@ -163,8 +190,10 @@ def update(i):
     idx = np.vstack([o[0] for o in outputs]).flatten()
     xy = np.vstack([o[1] for o in outputs])
     patch.set_xy(xy)
-    points.set_xdata(xy[idx, 0])
-    points.set_ydata(xy[idx, 1])
+
+    skip = 1#max(np.round(np.sum(idx) / 1000).astype(int), 1)
+    points.set_xdata(xy[idx, 0][::skip])
+    points.set_ydata(xy[idx, 1][::skip])
 
     timestamps[1:] = timestamps[:-1]
     timestamps[0] = time.time()
