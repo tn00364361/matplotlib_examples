@@ -3,32 +3,36 @@ import time
 import argparse
 from multiprocessing import Pool, cpu_count
 import numpy as np
+import numpy.random as random
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import matplotlib.patches as patches
-from shapely.geometry import MultiPolygon, box, Point
-from shapely.affinity import rotate, translate, scale
-from shapely.ops import cascaded_union
+import shapely.geometry as geo
+import shapely.affinity as aff
+import shapely.ops as ops
 
 
 tol = np.sqrt(np.finfo(float).eps)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--num_rays',
-                    help='Number of rays to simulate. (default: 1000)',
-                    type=int, default=1000)
+                    help='Number of rays to simulate. (default: 1200)',
+                    type=int, default=1200)
 parser.add_argument('--range',
-                    help='Maximum range of the LiDAR. (default: 5.0)',
-                    type=float, default=5.0)
+                    help='Maximum range of the LiDAR. (default: 25.0)',
+                    type=float, default=25.0)
+parser.add_argument('--sigma',
+                    help='Standard deviation of the noise. (default: 0.01)',
+                    type=float, default=0.01)
 parser.add_argument('--map_size',
-                    help='Size of the map. (default: 10.0)',
-                    type=float, default=10.0)
+                    help='Size of the map. (default: 50.0)',
+                    type=float, default=50.0)
 parser.add_argument('--num_items',
-                    help='Number of obstacles in the map. (default: 30)',
-                    type=int, default=30)
+                    help='Number of obstacles in the map. (default: 40)',
+                    type=int, default=40)
 parser.add_argument('--item_size',
-                    help='Size of the obstacles. (default: 1.0)',
-                    type=float, default=1.0)
+                    help='Size (area) of the obstacles. (default: 25.0)',
+                    type=float, default=25.0)
 parser.add_argument('--num_proc',
                     help='Number of threads. If non-positive, use all threads. (default: 0)',
                     type=int, default=0)
@@ -48,28 +52,34 @@ else:
 num_proc = min(num_proc, args.num_rays)
 
 
-assert args.num_items > 0
-# generate a random map
-obstacles = []
-w = args.item_size / 2
-for k in range(args.num_items):
-    if np.random.rand() > 0.5:
-        obstacles.append(box(-w, -w, w, w))
+def gen_obstacle(seed):
+    random.seed(seed)
+
+    if random.rand() > 0.5:
+        w = np.sqrt(args.item_size  / 4)
+        obstacle = geo.box(-w, -w, w, w)
     else:
-        obstacles.append(Point(0, 0).buffer(w, resolution=4))
+        r = np.sqrt(args.item_size / np.pi)
+        obstacle = geo.Point(0, 0).buffer(r, resolution=4)
 
-    ss = 1 + np.random.randn() * 0.2
-    obstacles[-1] = scale(obstacles[-1], ss, 1 / ss)
+    ss = 1 + random.rand()
+    obstacle = aff.scale(obstacle, ss, 1 / ss)
 
-    obstacles[-1] = rotate(obstacles[-1], np.random.rand() * 360)
+    obstacle = aff.rotate(obstacle, random.rand() * 360)
 
-    cc = np.random.rand(2) * args.map_size
-    obstacles[-1] = translate(obstacles[-1], *cc)
+    cc = random.rand(2) * args.map_size
+    obstacle = aff.translate(obstacle, *cc)
+
+    return obstacle
 
 
-obstacles = cascaded_union(obstacles)
-if type(obstacles) is not MultiPolygon:
-    obstacles = MultiPolygon([obstacles])
+with Pool(num_proc) as pool:
+    seeds = random.randint(2**32 - 1, size=args.num_items)
+    obstacles = pool.map(gen_obstacle, seeds)
+
+obstacles = ops.cascaded_union(obstacles)
+if type(obstacles) is not geo.MultiPolygon:
+    obstacles = geo.MultiPolygon([obstacles])
 
 # start (q0) and end (q1) points for all vertices
 q0 = np.vstack([np.asarray(o.exterior.coords)[:-1, :] for o in obstacles])
@@ -81,12 +91,19 @@ pt_lidar = np.ones(2) * args.map_size / 2
 theta = np.linspace(0, 2 * np.pi, args.num_rays, endpoint=False)
 u = args.range * np.vstack([np.cos(theta), np.sin(theta)]).T
 
+input_args = []
+num_pt_per_proc = args.num_rays // num_proc
+for k in range(num_proc):
+    aa = u[(k * num_pt_per_proc):((k + 1) * num_pt_per_proc)]
+    # aa = u[k::num_proc]
+    input_args.append((pt_lidar, aa))
+
 
 fig = plt.figure(1, figsize=(6, 6))
 ax = fig.add_subplot(1, 1, 1)
 
 for o in obstacles:
-    ax.plot(*o.exterior.coords.xy, 'k', lw=0.5)
+    ax.plot(*o.exterior.coords.xy, color='k', lw=0.5)
 
 center, = ax.plot([], [], '+', color=args.color, ms=16)
 points, = ax.plot([], [], '.', color=args.color, ms=4)
@@ -105,7 +122,7 @@ def raycast(pt_lidar_, u_):
         (2)
         Center of the LiDAR.
     *   u_
-        (n1, 2) numpy.ndarray
+        (n1, 2)
         Displacement vectors for the `n1` LiDAR rays.
     """
     d = q0 - pt_lidar_
@@ -113,15 +130,19 @@ def raycast(pt_lidar_, u_):
     dxu = np.vstack([np.cross(d, aa) for aa in u_])
 
     uxv = np.vstack([np.cross(aa, v) for aa in u_])
-
     uxv[uxv == 0] = tol
 
     t = dxv / uxv
     s = dxu / uxv
 
     t[(s < 0) | (s > 1) | (t < 0) | (t > 1)] = 1
+    t_min = np.min(t, axis=1, keepdims=True)
 
-    return pt_lidar_ + np.nanmin(t, axis=1, keepdims=True) * u_
+    idx_valid = t_min < 1
+    noise = args.sigma / args.range * random.randn(*t_min[t_min < 1].shape)
+    t_min[idx_valid] += noise
+
+    return idx_valid, pt_lidar_ + t_min * u_
 
 
 def on_move(event):
@@ -131,40 +152,30 @@ def on_move(event):
 
 fig.canvas.mpl_connect('motion_notify_event', on_move)
 
+
 pool = Pool(num_proc)
-input_args = []
-num_pt_per_proc = args.num_rays // num_proc
-for k in range(num_proc):
-    aa = u[(k * num_pt_per_proc):((k + 1) * num_pt_per_proc)]
-    input_args.append((pt_lidar, aa))
-
-
 timestamps = np.empty(10)
 
 
 def update(i):
-    timestamps[1:] = timestamps[:-1]
-    timestamps[0] = time.time()
-
-    xy = np.vstack(pool.starmap(raycast, input_args))
-
     center.set_xdata(pt_lidar[0])
     center.set_ydata(pt_lidar[1])
 
+    outputs = pool.starmap(raycast, input_args)
+    idx = np.vstack([o[0] for o in outputs]).flatten()
+    xy = np.vstack([o[1] for o in outputs])
     patch.set_xy(xy)
-
-    dist = np.linalg.norm(xy - pt_lidar[None, :], axis=-1)
-    idx = dist < (1 - tol) * args.range
-
     points.set_xdata(xy[idx, 0])
     points.set_ydata(xy[idx, 1])
 
+    timestamps[1:] = timestamps[:-1]
+    timestamps[0] = time.time()
     dt = np.mean(timestamps[:-1] - timestamps[1:])
 
     if i >= timestamps.size:
         print('average fps = {:.4f}'.format(1 / dt), end='\r')
 
-    return [patch, center, points]
+    return patch, center, points
 
 
 ani = FuncAnimation(fig, update, interval=0, blit=True)
