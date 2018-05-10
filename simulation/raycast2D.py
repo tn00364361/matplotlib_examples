@@ -32,8 +32,8 @@ parser.add_argument('--item_size',
                     help='Size (area) of the obstacles. (default: 25.0)',
                     type=float, default=25.0)
 parser.add_argument('--num_proc',
-                    help='Number of threads. If non-positive, use all the threads. (default: 0)',
-                    type=int, default=0)
+                    help='Number of threads. If non-positive, use all the threads. (default: 4)',
+                    type=int, default=4)
 parser.add_argument('--color',
                     help='Color of the LiDAR. (default: C0)',
                     type=str, default='C0')
@@ -59,6 +59,8 @@ def gen_obstacle(seed):
     else:
         r = np.sqrt(args.item_size / np.pi)
         obstacle = geo.Point(0, 0).buffer(r, resolution=64)
+        # print(np.asarray(obstacle.exterior.coords.xy).shape)
+        # print(obstacle.exterior)
 
     ss = np.sqrt(np.abs(random.randn()) + 1)
     obstacle = aff.scale(obstacle, ss, 1 / ss)
@@ -75,11 +77,9 @@ with Pool(num_proc) as pool:
     seeds = random.randint(2**32 - 1, size=args.num_items)
     obstacles = pool.map(gen_obstacle, seeds)
 
-obstacles = ops.cascaded_union(obstacles)
+obstacles = ops.cascaded_union(obstacles).simplify(args.map_size * 1e-3)
 if type(obstacles) is not geo.MultiPolygon:
     obstacles = geo.MultiPolygon([obstacles])
-
-obstacles = obstacles.simplify(args.map_size * 1e-3)
 
 
 def get_vertices(polygon):
@@ -115,7 +115,7 @@ u = args.range * np.vstack([np.cos(theta), np.sin(theta)]).T
 input_args = []
 num_pt_per_proc = np.ceil(args.num_rays / num_proc).astype(int)
 for k in range(num_proc):
-    aa = u[(k * num_pt_per_proc):((k + 1) * num_pt_per_proc)]
+    aa = u[(k * num_pt_per_proc):((k + 1) * num_pt_per_proc), :]
     input_args.append((pt_lidar, aa))
 
 

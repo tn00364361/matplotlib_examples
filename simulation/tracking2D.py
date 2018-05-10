@@ -13,9 +13,9 @@ parser.add_argument('--zeta',
                     type=float,
                     default=np.sqrt(0.5))
 parser.add_argument('--tau',
-                    help='Time constant in seconds. (default: 0.05)',
+                    help='Time constant in seconds. (default: 0.1)',
                     type=float,
-                    default=0.05)
+                    default=0.1)
 parser.add_argument('--dt',
                     help='Sampling time in seconds. (default: 0.01)',
                     type=float,
@@ -29,7 +29,8 @@ wn = 1 / args.zeta / args.tau
 Ac = np.array([[0, 1], [-wn**2, -2 * args.zeta * wn]])
 
 # second-order discrete-time system (2D)
-Ad = expm(block_diag(Ac, Ac) * args.dt)
+Ad = expm(Ac * args.dt)
+Ad = block_diag(Ad, Ad)
 
 fig = plt.figure(1, figsize=(8, 8))
 ax = fig.add_subplot(1, 1, 1)
@@ -49,7 +50,8 @@ x_des = np.zeros(4)
 
 def on_move(event):
     if event.xdata is not None and event.ydata is not None:
-        x_des[[0, 2]] = [event.xdata, event.ydata]
+        x_des[0] = event.xdata
+        x_des[2] = event.ydata
 
 
 fig.canvas.mpl_connect('motion_notify_event', on_move)
@@ -81,7 +83,7 @@ def update(i):
         line.set_color('C0')
         dot.set_color('C0')
 
-    return [dot, line]
+    return dot, line
 
 
 ani = FuncAnimation(fig, update, interval=1000 * args.dt, blit=True)
