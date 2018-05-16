@@ -17,9 +17,11 @@ coeffs = np.array([[0, 0, 0, 0.16, 0, 0],
 prob = np.array([0.01, 0.85, 0.07, 0.07])
 
 
-def f(x):
+def f(xy):
     idx = random.choice(4, p=prob)
-    return np.dot(coeffs[idx, :4].reshape([2, 2]), x) + coeffs[idx, 4:]
+    A = coeffs[idx, :4].reshape([2, 2])
+    b = coeffs[idx, 4:]
+    return np.dot(A, xy) + b
 
 
 num_points = 1000000
@@ -30,24 +32,28 @@ num_iter = np.round(num_points / num_proc).astype(int) + 1
 def iterate(seed):
     random.seed(seed)
 
-    x = np.zeros([2, num_iter])
+    points = np.zeros([2, num_iter])
     for k in range(1, num_iter):
-        x[:, k] = f(x[:, k - 1])
+        points[:, k] = f(points[:, k - 1])
 
-    return x[:, 1:]
+    return points[:, 1:]
 
 
 with Pool(num_proc) as pool:
     seeds = random.randint(2**32 - 1, size=num_proc)
-    x = np.hstack(pool.map(iterate, seeds))
+    xy = np.hstack(pool.map(iterate, seeds))
 
+x_bin = np.arange(-3, 3, 0.02)
+y_bin = np.arange(-0.5, 10.5, 0.02)
 
-fig = plt.figure(1, figsize=(6, 8))
+H = np.histogram2d(xy[0, :], xy[1, :], bins=[x_bin, y_bin])[0]
+
+fig = plt.figure(1, figsize=(5, 8))
 ax = fig.add_subplot(1, 1, 1)
-ax.plot(x[0, :], x[1, :], '.', ms=2, alpha=min(1e4 / num_points, 1))
-ax.axis('scaled')
-ax.set_xlim(-4, 4)
-ax.set_ylim(-1, 11)
+
+ax.imshow(np.log1p(H).T,
+          origin='lower',
+          extent=(x_bin.min(), x_bin.max(), y_bin.min(), y_bin.max()))
 
 fig.tight_layout()
 plt.show()

@@ -8,19 +8,12 @@ from scipy.linalg import expm, block_diag, norm
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--zeta',
-                    help='Damping ratio. (default: sqrt(0.5))',
-                    type=float,
-                    default=np.sqrt(0.5))
-parser.add_argument('--tau',
-                    help='Time constant in seconds. (default: 0.1)',
-                    type=float,
-                    default=0.1)
-parser.add_argument('--dt',
-                    help='Sampling time in seconds. (default: 0.01)',
-                    type=float,
-                    default=0.01)
-
+parser.add_argument('--zeta', type=float, default=np.sqrt(0.5),
+                    help='Damping ratio. (default: sqrt(0.5))')
+parser.add_argument('--tau', type=float, default=0.1,
+                    help='Time constant in seconds. (default: 0.1)')
+parser.add_argument('--dt', type=float, default=0.01,
+                    help='Sampling time in seconds. (default: 0.01)')
 
 args = parser.parse_args()
 
@@ -64,8 +57,8 @@ def update(i):
     timestamps[0] = time.time()
 
     if i > timestamps.size:
-        freq = 1 / np.mean(timestamps[:-1] - timestamps[1:])
-        print('average fps = {:.4f}'.format(freq), end='\r')
+        dt = np.mean(timestamps[:-1] - timestamps[1:])
+        print('Average FPS = {:.4f}'.format(1 / dt), end='\r')
 
     x[:, 1:] = x[:, :-1]
     x[:, 0] = x_des + Ad @ (x[:, 0] - x_des)

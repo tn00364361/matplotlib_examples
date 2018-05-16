@@ -13,39 +13,30 @@ import shapely.ops as ops
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--num_rays',
-                    help='Number of rays to simulate. (default: 1800)',
-                    type=int, default=1800)
-parser.add_argument('--range',
-                    help='Maximum range of the LiDAR. (default: 25.0)',
-                    type=float, default=25.0)
-parser.add_argument('--sigma',
-                    help='Standard deviation of the noise. (default: 0.01)',
-                    type=float, default=0.01)
-parser.add_argument('--map_size',
-                    help='Size of the map. (default: 50.0)',
-                    type=float, default=50.0)
-parser.add_argument('--num_items',
-                    help='Number of obstacles in the map. (default: 40)',
-                    type=int, default=40)
-parser.add_argument('--item_size',
-                    help='Size (area) of the obstacles. (default: 25.0)',
-                    type=float, default=25.0)
-parser.add_argument('--num_proc',
-                    help='Number of threads. If non-positive, use all the threads. (default: 4)',
-                    type=int, default=4)
-parser.add_argument('--color',
-                    help='Color of the LiDAR. (default: C0)',
-                    type=str, default='C0')
+parser.add_argument('--num_rays', '-nr', type=int, default=1800,
+                    help='Number of rays to simulate. (default: 1800)')
+parser.add_argument('--range', '-r', type=float, default=25.0,
+                    help='Maximum range of the LiDAR. (default: 25.0)')
+parser.add_argument('--sigma', type=float, default=0.01,
+                    help='Standard deviation of the noise. (default: 0.01)')
+parser.add_argument('--map_size', '-ms', type=float, default=50.0,
+                    help='Size of the map. (default: 50.0)')
+parser.add_argument('--num_items', '-ni', type=int, default=40,
+                    help='Number of obstacles in the map. (default: 40)')
+parser.add_argument('--item_size', '-is', type=float, default=25.0,
+                    help='Size (area) of the obstacles. (default: 25.0)')
+parser.add_argument('--num_proc', '-np', type=int, default=4,
+                    help='Number of threads. If non-positive, use all the threads. (default: 4)')
+parser.add_argument('--color', '-c', type=str, default='C0',
+                    help='Color of the LiDAR. (default: C0)')
 
 args = parser.parse_args()
 
 
-assert args.num_proc <= cpu_count()
 if args.num_proc <= 0:
     num_proc = cpu_count()
 else:
-    num_proc = args.num_proc
+    num_proc = min(cpu_count(), args.num_proc)
 
 num_proc = min(num_proc, args.num_rays)
 
@@ -200,7 +191,7 @@ def update(i):
     dt = np.mean(timestamps[:-1] - timestamps[1:])
 
     if i >= timestamps.size:
-        print('average fps = {:.4f}'.format(1 / dt), end='\r')
+        print('Average FPS = {:.4f}'.format(1 / dt), end='\r')
 
     return patch, center, points
 

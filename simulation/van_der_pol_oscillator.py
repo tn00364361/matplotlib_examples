@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from scipy.integrate import solve_ivp
-from scipy.optimize import fixed_point, minimize
+from scipy.optimize import fixed_point
 
 
 '''
@@ -15,44 +15,30 @@ Reference:
 '''
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--mu',
-                    help='Damping coefficient. (default: 1.0)',
-                    type=float,
-                    default=1.0)
-parser.add_argument('--omega',
-                    help='Natural frequency in rad/s. (default: 1.0)',
-                    type=float,
-                    default=1.0)
-parser.add_argument('--num_sim',
-                    help='Number of simulations. (default: 25)',
-                    type=int,
-                    default=25)
-parser.add_argument('--duration',
-                    help='Duration for the simulation in seconds. (default: 20.0)',
-                    type=float,
-                    default=20.0)
-parser.add_argument('--no-animation',
-                    dest='animate',
-                    help='Disable animation.',
-                    action='store_false')
-parser.add_argument('--save',
-                    dest='save_video',
-                    help='Save the animation as `Van der Pol oscillator.mp4`',
-                    action='store_true')
-parser.add_argument('--log-quiver',
-                    dest='log_quiver',
-                    help='Plot the flow in log-scale.',
-                    action='store_true')
-parser.set_defaults(animate=True, log_quiver=True, save_video=False)
+parser.add_argument('--mu', type=float, default=1.0,
+                    help='Damping coefficient. (default: 1.0)')
+parser.add_argument('--omega', type=float, default=1.0,
+                    help='Natural frequency in rad/s. (default: 1.0)')
+parser.add_argument('--num_sim', type=int, default=25,
+                    help='Number of simulations. (default: 25)')
+parser.add_argument('--duration', type=float, default=20.0,
+                    help='Duration for the simulation in seconds. (default: 20.0)')
+parser.add_argument('--no-animation', dest='animate', action='store_false',
+                    help='Disable animation.')
+parser.add_argument('--save', dest='save_video', action='store_true',
+                    help='Save the animation as `Van der Pol oscillator.mp4`')
+parser.add_argument('--log-quiver', dest='log_quiver', action='store_true',
+                    help='Plot the flow in log-scale.')
+parser.set_defaults(animate=True, log_quiver=False, save_video=False)
 
 args = parser.parse_args()
 
 
-def calc_f(t, x):
+def calc_f(t, x, mu=args.mu, omega=args.omega):
     x = x.reshape([2, -1])
     x_dot = np.empty_like(x)
     x_dot[0, :] = x[1, :]
-    x_dot[1, :] = args.mu * (1 - x[0, :]**2) * x[1, :] - args.omega**2 * x[0, :]
+    x_dot[1, :] = mu * (1 - x[0, :]**2) * x[1, :] - omega**2 * x[0, :]
     return x_dot.flatten()
 
 
@@ -132,10 +118,10 @@ def update(i):
     i1, i2 = max(0, step * i - int(0.1 / dt)), step * i + 1
 
     for k in range(len(colors)):
-        idx = ((np.arange(args.num_sim) + k) % len(colors)) == 0
+        idx = np.mod(np.arange(args.num_sim) + k, len(colors)) == 0
 
-        lines[k].set_xdata([np.append(arr, np.nan) for arr in x[0, idx, i1:i2]])
-        lines[k].set_ydata([np.append(arr, np.nan) for arr in x[1, idx, i1:i2]])
+        lines[k].set_xdata([np.append(xx, np.nan) for xx in x[0, idx, i1:i2]])
+        lines[k].set_ydata([np.append(xx, np.nan) for xx in x[1, idx, i1:i2]])
 
         dots[k].set_xdata(x[0, idx, step * i])
         dots[k].set_ydata(x[1, idx, step * i])

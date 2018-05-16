@@ -1,0 +1,4 @@
+scipy>=1.0
+matplotlib>=2.0
+shapely>=1.6
+scikit-image

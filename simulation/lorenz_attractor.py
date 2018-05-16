@@ -12,22 +12,14 @@ Reference:
 '''
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--num_sim',
-                    help='Number of simulations. (default: 10)',
-                    type=int,
-                    default=10)
-parser.add_argument('--no-animation',
-                    dest='animate',
-                    help='Disable animation.',
-                    action='store_false')
-parser.add_argument('--save',
-                    dest='save_video',
-                    help='Save the animation as `Lorenz attractor.mp4`',
-                    action='store_true')
-parser.add_argument('--t_span',
-                    help='Duration for the simulation. (default: 45.0)',
-                    type=float,
-                    default=45.0)
+parser.add_argument('--num_sim', type=int, default=10,
+                    help='Number of simulations. (default: 10)')
+parser.add_argument('--no-animation', dest='animate', action='store_false',
+                    help='Disable animation.')
+parser.add_argument('--save', dest='save_video', action='store_true',
+                    help='Save the animation as `Lorenz attractor.mp4`')
+parser.add_argument('--duration', type=float, default=45.0,
+                    help='Duration for the simulation. (default: 45.0)')
 parser.set_defaults(animate=True, save_video=False)
 
 args = parser.parse_args()
@@ -38,25 +30,21 @@ rho, sigma, beta = 28, 10, 8 / 3
 
 def calc_f(t, x):
     x = x.reshape([3, -1])
-    x_dot = np.array([
-        sigma * (x[1, :] - x[0, :]),
-        x[0, :] * (rho - x[2, :]) - x[1, :],
-        x[0, :] * x[1, :] - beta * x[2, :]
-        ])
+    x_dot = np.vstack([sigma * (x[1, :] - x[0, :]),
+                       x[0, :] * (rho - x[2, :]) - x[1, :],
+                       x[0, :] * x[1, :] - beta * x[2, :]])
     return x_dot.flatten()
 
 
 # simulate with a very high sampling rate
 dt = 0.001
-t_eval = np.arange(0, args.t_span, dt)
+t_eval = np.arange(0, args.duration, dt)
 
-x_init = np.zeros([3, args.num_sim])
-x_init[0, :] = np.random.randn(1)
-x_init[1, :] = np.random.randn(1)
-x_init[2, :] = np.random.randn(1) + rho - 1
+x_init = np.random.randn(3, args.num_sim)
+x_init[2, :] += rho - 1
 x_init += np.random.randn(*x_init.shape) * 1e-6
 sol = solve_ivp(calc_f, t_eval[[0, -1]], x_init.flatten(), t_eval=t_eval)
-x = sol.y.reshape([3, args.num_sim, -1])
+x = sol.y.reshape([3, args.num_sim, sol.t.size])
 
 fig = plt.figure(1, figsize=(6, 6))
 ax = fig.add_subplot(1, 1, 1, projection='3d')
@@ -81,7 +69,7 @@ if args.animate:
         dots.append(ax.plot([], [], [], '.', color=clr, ms=12)[0])
 
     # set the frame rate of the animation to be 50 Hz
-    step = int(0.02 / dt)
+    step = np.round(0.02 / dt).astype(int)
 
     def update(i):
         i1, i2 = max(0, step * i - int(0.1 / dt)), step * i + 1
