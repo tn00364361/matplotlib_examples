@@ -23,8 +23,8 @@ parser.add_argument('--map_size', '-ms', type=float, default=50.0,
                     help='Size of the map. (default: 50.0)')
 parser.add_argument('--num_items', '-ni', type=int, default=40,
                     help='Number of obstacles in the map. (default: 40)')
-parser.add_argument('--item_size', '-is', type=float, default=25.0,
-                    help='Size (area) of the obstacles. (default: 25.0)')
+parser.add_argument('--item_size', '-is', type=float, default=30.0,
+                    help='Size (area) of the obstacles. (default: 30.0)')
 parser.add_argument('--num_proc', '-np', type=int, default=4,
                     help='Number of threads. If non-positive, use all the threads. (default: 4)')
 parser.add_argument('--color', '-c', type=str, default='C0',
@@ -40,23 +40,29 @@ else:
 
 num_proc = min(num_proc, args.num_rays)
 
+tol = np.sqrt(np.finfo(float).eps)
+
+theta = np.linspace(0, 2 * np.pi, 1024, endpoint=False)
+xc, yc = np.cos(theta), np.sin(theta)
+xy_ball = np.vstack([xc, yc]).T
+
 
 def gen_obstacle(seed):
     random.seed(seed)
 
-    if random.rand() > 0.5:
-        w = np.sqrt(args.item_size / 4)
-        obstacle = geo.box(-w, -w, w, w)
+    a = random.rand()
+    if a > 0.5:
+        order = 2 / a
+        scale = (np.abs(xc)**order + np.abs(yc)**order)**(1 / order)
+        obstacle = geo.Polygon(xy_ball / scale[:, None])
     else:
-        r = np.sqrt(args.item_size / np.pi)
-        obstacle = geo.Point(0, 0).buffer(r, resolution=64)
-        # print(np.asarray(obstacle.exterior.coords.xy).shape)
-        # print(obstacle.exterior)
+        obstacle = geo.box(-1, -1, 1, 1)
 
+    s1 = np.sqrt(args.item_size / obstacle.area)
     ss = np.sqrt(np.abs(random.randn()) + 1)
-    obstacle = aff.scale(obstacle, ss, 1 / ss)
+    obstacle = aff.scale(obstacle, s1 * ss, s1 / ss)
 
-    obstacle = aff.rotate(obstacle, random.rand() * 360)
+    obstacle = aff.rotate(obstacle, random.rand() * 180)
 
     cc = random.rand(2) * args.map_size
     obstacle = aff.translate(obstacle, *cc)
@@ -116,6 +122,7 @@ ax = fig.add_subplot(1, 1, 1)
 for o in obstacles:
     xy = np.asarray(o.exterior.coords.xy).T
     ax.add_patch(patches.Polygon(xy, fc=np.ones(3) * 0.5, ec='k', lw=0.5))
+    # ax.plot(xy[:, 0], xy[:, 1], 'k.')
 
     for i in o.interiors:
         xy = np.asarray(i.coords.xy).T
@@ -135,7 +142,7 @@ def raycast(pt_lidar_, u_):
     """
     Input:
     *   pt_lidar_
-        (2)
+        (2,)
         Center of the LiDAR.
     *   u_
         (N, 2)
@@ -180,11 +187,12 @@ def update(i):
     outputs = pool.starmap(raycast, input_args)
     idx = np.hstack([o[0] for o in outputs])
     xy = np.vstack([o[1] for o in outputs])
-    patch.set_xy(xy)
 
     skip = max(np.round(np.sum(idx) / 1000).astype(int), 1)
     points.set_xdata(xy[idx, 0][::skip])
     points.set_ydata(xy[idx, 1][::skip])
+
+    patch.set_xy(xy)
 
     timestamps[1:] = timestamps[:-1]
     timestamps[0] = time.time()

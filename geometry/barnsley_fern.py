@@ -1,4 +1,5 @@
 #! /usr/bin/python3
+import argparse
 from multiprocessing import Pool, cpu_count
 import numpy as np
 import numpy.random as random
@@ -9,6 +10,15 @@ import matplotlib.pyplot as plt
 Reference:
     https://en.wikipedia.org/wiki/Barnsley_fern
 '''
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--num_pt', '-n', type=int, default=1000000,
+                    help='Number of points. (default: 1000000)')
+parser.add_argument('--resolution', '-r', type=float, default=0.02,
+                    help='Resolution of the grids. (default: 0.02)')
+
+args = parser.parse_args()
+
 
 coeffs = np.array([[0, 0, 0, 0.16, 0, 0],
                    [0.85, 0.04, -0.04, 0.85, 0, 1.60],
@@ -24,9 +34,8 @@ def f(xy):
     return np.dot(A, xy) + b
 
 
-num_points = 1000000
 num_proc = cpu_count()
-num_iter = np.round(num_points / num_proc).astype(int) + 1
+num_iter = np.round(args.num_pt / num_proc).astype(int) + 1
 
 
 def iterate(seed):
@@ -43,8 +52,8 @@ with Pool(num_proc) as pool:
     seeds = random.randint(2**32 - 1, size=num_proc)
     xy = np.hstack(pool.map(iterate, seeds))
 
-x_bin = np.arange(-3, 3, 0.02)
-y_bin = np.arange(-0.5, 10.5, 0.02)
+x_bin = np.arange(-3, 3, args.resolution)
+y_bin = np.arange(-0.5, 10.5, args.resolution)
 
 H = np.histogram2d(xy[0, :], xy[1, :], bins=[x_bin, y_bin])[0]
 
