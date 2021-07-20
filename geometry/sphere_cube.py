@@ -1,14 +1,18 @@
+#!/usr/bin/python3
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 
-vtxs = np.array([[1, 1, 1], [-1, 1, 1], [-1, -1, 1], [1, -1, 1],
-                 [1, 1, -1], [-1, 1, -1], [-1, -1, -1], [1, -1, -1]],
-                dtype=np.float64)
+vtxs = np.array([
+    [1, 1, 1], [-1, 1, 1], [-1, -1, 1], [1, -1, 1],
+    [1, 1, -1], [-1, 1, -1], [-1, -1, -1], [1, -1, -1]
+], dtype=np.float64)
 vtxs /= np.sqrt(3)
-squares = np.array([[0, 4, 5, 1], [7, 4, 0, 3], [5, 4, 7, 6],
-                    [1, 2, 3, 0], [6, 2, 1, 5], [3, 2, 6, 7]])
+squares = np.array([
+    [0, 4, 5, 1], [7, 4, 0, 3], [5, 4, 7, 6],
+    [1, 2, 3, 0], [6, 2, 1, 5], [3, 2, 6, 7]
+])
 
 print('%d nodes, %d squares' % (vtxs.shape[0], squares.shape[0]))
 mid_nodes = np.zeros((0, 3), dtype=np.uint64)
@@ -51,12 +55,15 @@ faces = np.vstack(faces)
 
 fig = plt.figure(1, figsize=(8, 8))
 ax = fig.add_subplot(111, projection='3d')
-ax.axis('scaled')
+# ax.axis('scaled')
 
-ax.plot_trisurf(vtxs[:, 0], vtxs[:, 1], vtxs[:, 2],
-                triangles=faces,
-                shade=True,
-                color=0.5 * np.ones(3))
+ax.plot_trisurf(
+    vtxs[:, 0], vtxs[:, 1], vtxs[:, 2],
+    triangles=faces,
+    shade=True,
+    color=0.5 * np.ones(3)
+)
+
 axlim = 1.1
 ax.set_xlim(-axlim, axlim)
 ax.set_ylim(-axlim, axlim)

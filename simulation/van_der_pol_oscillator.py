@@ -130,16 +130,20 @@ def update(i):
 
 
 if args.animate:
-    ani = FuncAnimation(fig1,
-                        update,
-                        frames=t_eval.size // step,
-                        interval=dt * step * 1000,
-                        blit=True)
+    ani = FuncAnimation(
+        fig1,
+        update,
+        frames=t_eval.size // step,
+        interval=dt * step * 1000,
+        blit=True
+    )
 
     if args.save_video:
-        ani.save('Van der Pol oscillator.mp4',
-                 dpi=int(1080 / fig1.get_size_inches()[1]),
-                 fps=1 / dt,
-                 bitrate=4096)
+        ani.save(
+            'Van der Pol oscillator.mp4',
+            dpi=int(1080 / fig1.get_size_inches()[1]),
+            fps=1 / dt,
+            bitrate=4096
+        )
 
 plt.show()

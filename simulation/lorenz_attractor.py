@@ -18,8 +18,8 @@ parser.add_argument('--no-animation', dest='animate', action='store_false',
                     help='Disable animation.')
 parser.add_argument('--save', dest='save_video', action='store_true',
                     help='Save the animation as `Lorenz attractor.mp4`')
-parser.add_argument('--duration', type=float, default=45.0,
-                    help='Duration for the simulation. (default: 45.0)')
+parser.add_argument('--duration', type=float, default=10.0,
+                    help='Duration for the simulation. (default: 10.0)')
 parser.set_defaults(animate=True, save_video=False)
 
 args = parser.parse_args()
@@ -28,11 +28,13 @@ args = parser.parse_args()
 rho, sigma, beta = 28, 10, 8 / 3
 
 
-def calc_f(t, x):
+def f_lorenz(t, x):
     x = x.reshape([3, -1])
-    x_dot = np.vstack([sigma * (x[1, :] - x[0, :]),
-                       x[0, :] * (rho - x[2, :]) - x[1, :],
-                       x[0, :] * x[1, :] - beta * x[2, :]])
+    x_dot = np.vstack([
+        sigma * (x[1, :] - x[0, :]),
+        x[0, :] * (rho - x[2, :]) - x[1, :],
+        x[0, :] * x[1, :] - beta * x[2, :]
+    ])
     return x_dot.flatten()
 
 
@@ -43,14 +45,16 @@ t_eval = np.arange(0, args.duration, dt)
 x_init = np.random.randn(3, args.num_sim)
 x_init[2, :] += rho - 1
 x_init += np.random.randn(*x_init.shape) * 1e-6
-sol = solve_ivp(calc_f, t_eval[[0, -1]], x_init.flatten(), t_eval=t_eval)
+sol = solve_ivp(f_lorenz, t_eval[[0, -1]], x_init.flatten(), t_eval=t_eval)
 x = sol.y.reshape([3, args.num_sim, sol.t.size])
 
 fig = plt.figure(1, figsize=(6, 6))
 ax = fig.add_subplot(1, 1, 1, projection='3d')
 for k in range(args.num_sim):
-    ax.plot(x[0, k, :], x[1, k, :], x[2, k, :],
-            color='k', lw=0.5, alpha=1.0 / args.num_sim)
+    ax.plot(
+        x[0, k, :], x[1, k, :], x[2, k, :],
+        color='k', lw=0.5, alpha=1.0 / args.num_sim
+    )
 
 ax.view_init(elev=15, azim=-45)
 ax.set_xlim(-25, 25)
@@ -83,16 +87,20 @@ if args.animate:
 
         return lines + dots
 
-    ani = FuncAnimation(fig,
-                        update,
-                        frames=t_eval.size // step,
-                        interval=dt * step * 1000,
-                        blit=True)
+    ani = FuncAnimation(
+        fig,
+        update,
+        frames=t_eval.size // step,
+        interval=dt * step * 1000,
+        blit=True
+    )
 
     if args.save_video:
-        ani.save('Lorenz attractor.mp4',
-                 dpi=int(1080 / fig.get_size_inches()[1]),
-                 fps=1 / (dt * step),
-                 bitrate=4096)
+        ani.save(
+            'Lorenz attractor.mp4',
+            dpi=int(1080 / fig.get_size_inches()[1]),
+            fps=1 / (dt * step),
+            bitrate=4096
+        )
 
 plt.show()

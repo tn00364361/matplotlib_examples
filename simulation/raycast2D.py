@@ -106,7 +106,7 @@ pt_lidar = random.rand(2) * args.map_size
 # while geo.Point(*pt_lidar).within(obstacles):
 #     pt_lidar = random.rand(2) * args.map_size
 
-theta = np.linspace(0, 2 * np.pi, args.num_rays, endpoint=False)
+theta = np.linspace(-1, 1, args.num_rays, endpoint=False) * np.pi
 u = args.range * np.vstack([np.cos(theta), np.sin(theta)]).T
 
 input_args = []
@@ -193,13 +193,16 @@ def update(i):
     points.set_ydata(xy[idx, 1][::skip])
 
     patch.set_xy(xy)
+    # patch.set_xy(np.vstack([
+    #     xy, pt_lidar
+    # ]))
 
     timestamps[1:] = timestamps[:-1]
     timestamps[0] = time.time()
     dt = np.mean(timestamps[:-1] - timestamps[1:])
 
     if i >= timestamps.size:
-        print('Average FPS = {:.4f}'.format(1 / dt), end='\r')
+        print(f'Average FPS = {1 / dt:.4f}', end='\r')
 
     return patch, center, points
 

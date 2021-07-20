@@ -12,8 +12,9 @@ parser.add_argument('--step', '-s', type=float, default=0.1,
                     help='Step size of each scoll event. (default: 0.1)')
 parser.add_argument('--num_pt', '-n', type=int, default=1024,
                     help='Number of points. (default: 1024)')
-
 args = parser.parse_args()
+
+args.num_pt = 4 * (args.num_pt // 4) + 1
 
 p = np.array([args.order])
 theta = np.linspace(0, 2 * np.pi, args.num_pt)
@@ -43,7 +44,7 @@ def update(i):
     line.set_xdata(x / scale)
     line.set_ydata(y / scale)
 
-    print('order = {:.4f}'.format(p[0]), end='\r')
+    print(f'order = {p[0]:.4f}', end='\r')
 
     return [line]
 
