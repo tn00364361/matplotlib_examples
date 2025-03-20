@@ -1,56 +1,85 @@
 #! /usr/bin/python3
 import argparse
+from functools import partial
+import sys
 import numpy as np
+from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--order', '-o', type=float, default=2.0,
-                    help='Order of the unit ball. (default: 2.0)')
-parser.add_argument('--step', '-s', type=float, default=0.1,
-                    help='Step size of each scoll event. (default: 0.1)')
-parser.add_argument('--num_pt', '-n', type=int, default=1024,
-                    help='Number of points. (default: 1024)')
-args = parser.parse_args()
-
-args.num_pt = 4 * (args.num_pt // 4) + 1
-
-p = np.array([args.order])
-theta = np.linspace(0, 2 * np.pi, args.num_pt)
-x, y = np.cos(theta), np.sin(theta)
+FloarArray = NDArray[np.float32 | np.float64]
 
 
-fig = plt.figure(1, figsize=(6, 6))
-ax = fig.add_subplot(1, 1, 1)
-
-line, = ax.plot(x, y)
-
-ax.axis('scaled')
-ax.set_xlim(-1.1, 1.1)
-ax.set_ylim(-1.1, 1.1)
-ax.grid(True)
+def on_scroll(event, order: FloarArray, step_size: float):
+    order[:] = np.maximum(order + event.step * step_size, step_size)
 
 
-def on_scroll(event):
-    p[:] = max(p + event.step * args.step, args.step)
+def update(i: int, order: FloarArray, line: plt.Line2D):
+    xy: FloarArray = line.get_xydata().copy()
+    scale = (np.abs(xy[:, 0]) ** order + np.abs(xy[:, 1]) ** order) ** (1 / order)
+    line.set_xdata(xy[:, 0] / scale)
+    line.set_ydata(xy[:, 1] / scale)
 
-
-fig.canvas.mpl_connect('scroll_event', on_scroll)
-
-
-def update(i):
-    scale = (np.abs(x)**p + np.abs(y)**p)**(1 / p)
-    line.set_xdata(x / scale)
-    line.set_ydata(y / scale)
-
-    print(f'order = {p[0]:.4f}', end='\r')
+    print(f"order = {order[0]:.4f}", end="\r")
 
     return [line]
 
 
-print('Scroll the mouse wheel to change the order of the unit ball.')
-ani = FuncAnimation(fig, update, interval=20, blit=True)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--order",
+        "-o",
+        type=float,
+        default=2.0,
+        help="Order of the unit ball. (default: 2.0)",
+    )
+    parser.add_argument(
+        "--step",
+        "-s",
+        type=float,
+        default=0.1,
+        help="Step size of each scoll event. (default: 0.1)",
+    )
+    parser.add_argument(
+        "--num_points",
+        "-n",
+        type=int,
+        default=1024,
+        help="Number of points. (default: 1024)",
+    )
+    args = parser.parse_args()
 
-fig.tight_layout()
-plt.show()
+    args.num_points = 4 * (args.num_points // 4) + 1
+
+    order = np.array([args.order])
+    theta = np.linspace(0, 2 * np.pi, args.num_points)
+
+    fig = plt.figure(1, figsize=(6, 6))
+    ax = fig.add_subplot(1, 1, 1)
+    (line,) = ax.plot(np.cos(theta), np.sin(theta))
+
+    ax.axis("scaled")
+    ax.set_xlim(-1.2, 1.2)
+    ax.set_ylim(-1.2, 1.2)
+    ax.grid(True)
+
+    fig.canvas.mpl_connect(
+        "scroll_event", partial(on_scroll, order=order, step_size=args.step)
+    )
+    print("Scroll the mouse wheel to change the order of the unit ball.")
+    _ = FuncAnimation(
+        fig,
+        partial(update, order=order, line=line),
+        interval=20,
+        blit=True,
+        cache_frame_data=False,
+    )
+
+    fig.tight_layout()
+    plt.show()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
