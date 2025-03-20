@@ -1,4 +1,6 @@
-scipy>=1.0
-matplotlib>=2.0
-shapely>=1.6
-scikit-image
+numpy==2.2.4
+scipy==1.15.2
+matplotlib==3.10.1
+ipython==9.0.2
+shapely==2.0.7
+scikit-image==0.25.2
